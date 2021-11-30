@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    p {
+      margin: 0;
+      padding: 0;
+    }
+    .box {
+      height: 90px;
+    }
+
+    .opration-range,
+    .opration-color,
+    .opration-hide {
+      padding: 10px;
+      margin-top: 20px;
+      border: solid 1px #ccc;
+    }
+
+    .inputer-range {
+      display: flex;
+      align-items: center;
+    }
+
+    .inputer-range span:first-of-type {
+      font-size: 16px;
+      margin-right: 10px;
+    }
+
+    .confirm-range-btn {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div 
+    class="box" 
+    xdeg="135deg" 
+    ydeg="45deg" 
+    size="30px 30px" 
+    xColor="#f00000" 
+    yColor="#c9811d"
+  ></div>
+  <!-- 操作区域 -->
+  <div class="opration">
+    <button class="change-shape" animation-btn xdeg="90deg" ydeg="0deg">网状1</button>
+    <button class="change-shape" animation-btn xdeg="135deg" ydeg="45deg">网状2</button>
+    <button class="change-shape" animation-btn xdeg="1deg" ydeg="89deg">网状3</button>
+    <div class="opration-range">
+      <p>
+        <span>拖动选择角度</span>
+      </p>
+      <div class="inputer-range">
+        <span>XDeg</span>
+        <input id="inputer-range-xdeg" min="0" max="360" value="0" type="range" />
+        <span>0</span>
+        <span>deg</span>
+      </div>
+      <div class="inputer-range">
+        <span>YDeg</span>
+        <input id="inputer-range-ydeg" min="0" max="360" value="0" type="range" />
+        <span>0</span>
+        <span>deg</span>
+      </div>
+      <button animation-btn id="js-confirm-range-btn" class="confirm-range-btn">确定</button>
+    </div>
+    <div class="opration-color">
+      <p>
+        <span>点击更改颜色</span>
+      </p>
+      <div class="inputer-color">
+        <span>XDeg</span>
+        <input class="inputer-color-change" change-type="xColor" value="#f00000" type="color" />
+        <span>0</span>
+      </div>
+      <div class="inputer-color">
+        <span>YDeg</span>
+        <input class="inputer-color-change" change-type="yColor" type="color" />
+        <span>0</span>
+      </div>
+    </div>
+    <div class="opration-hide">
+      <p>
+        <span>点击隐藏对应的线</span>
+      </p>
+      <div class="inputer-hide">
+        <label>
+          <span>XDeg</span>
+          <input 
+            key="isHideXStyle"
+            name="inputer-hide-change" 
+            class="inputer-hide-change" 
+            type="radio" 
+          />
+        </label>
+        <span>未隐藏</span>
+      </div>
+      <div class="inputer-hide">
+        <label>
+          <span>YDeg</span>
+          <input 
+            key="isHideYStyle"
+            name="inputer-hide-change" 
+            class="inputer-hide-change" 
+            type="radio" 
+          />
+        </label>
+        <span>未隐藏</span>
+      </div>
+      <div style="margin-top: 10px" class="inputer-hide">
+        <button id="js-cancel-hide-btn">取消隐藏</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    !function (w, d) {
+      let _ = {
+        animationIsInProgress: false,
+        ctx: document.querySelector('.box'),
+        requestId: '',
+        activeColor: 'red',
+        activeItem: null,
+        checkedRadio: null,
+        preCheckedRadio: null,
+        init() {
+          this.initRender();
+          this.initOthers();
+          this.initRange();
+          this.initColor();
+          this.initExecHideOparation();
+          this.proxyProgress();
+        },
+        initRender() {
+          const oBoxAttr = this.ctx.attributes;
+          const xColor = oBoxAttr.xColor.value;
+          const yColor = oBoxAttr.yColor.value;
+          const params = {
+            xColor,
+            yColor,
+            size: oBoxAttr.size.value
+          };
+          // init color selector
+          Array.prototype.forEach.call(document.querySelectorAll('.inputer-color-change'), item => {
+            item.value = params[item.getAttribute('change-type')];
+            item.nextElementSibling.textContent = item.value
+          });
+          this._render(Object.assign(this.getDeg(), params));
+        },
+        initOthers() {
+          const changeShapeBtnGroup = document.querySelectorAll('.change-shape');
+          Array.prototype.forEach.call(changeShapeBtnGroup, item => {
+            item._defaultColor = item.style.color;
+            item.addEventListener('click', function (e) {
+              _._animation(this);
+            });
+          });
+        },
+        initRange() {
+          const confirmRangeBtn = document.querySelector('#js-confirm-range-btn');
+          const xRangeDeg = document.querySelector('#inputer-range-xdeg');
+          const yRangeDeg = document.querySelector('#inputer-range-ydeg');
+          [xRangeDeg, yRangeDeg].forEach(item => {
+              item.addEventListener('input', function () {
+                this.nextElementSibling.textContent = this.value
+              })
+          })
+          confirmRangeBtn.addEventListener('click', function () {
+            this.setAttribute('xdeg', xRangeDeg.value)
+            this.setAttribute('ydeg', yRangeDeg.value)
+            this._defaultColor = this.style.color;
+            _._animation(this, {
+              type: 'range'
+            });
+          })
+        },
+        initColor() {
+          Array.prototype.forEach.call(document.querySelectorAll('.inputer-color-change'), item => {
+            item.addEventListener('change', function () {
+              const changeType = this.getAttribute('change-type');
+              _._render({
+                [changeType]: this.value
+              });
+              _.ctx.setAttribute(changeType, this.value);
+              this.nextElementSibling.textContent = this.value
+            })
+          });
+        },
+        initExecHideOparation() {
+          let changeStatus = () => {
+            let change = (ele) => {
+              ele.parentElement.nextElementSibling.textContent = `${ele.checked ? '已' : '未'}隐藏`;
+            }
+            change(_.checkedRadio);
+            _.preCheckedRadio && change(_.preCheckedRadio);
+          }
+          Array.prototype.forEach.call(document.querySelectorAll('.inputer-hide-change'), item => {
+            item.addEventListener('change', function () {
+              _.preCheckedRadio = _.checkedRadio;
+              _.checkedRadio = item;
+              changeStatus();
+              const key = this.getAttribute('key');
+              const params = {
+                [key]: true,
+              };
+              if(_.preCheckedRadio) {
+                params[_.preCheckedRadio.getAttribute('key')]=false
+              }
+              _._render(params);
+              _.ctx[key] = true;
+            })
+          });
+          document.querySelector('#js-cancel-hide-btn').addEventListener('click', function() {
+            if(_.checkedRadio) {
+              _.checkedRadio.checked = false;
+              _.preCheckedRadio.checked = false;
+              changeStatus();
+              _.preCheckedRadio = _.checkedRadio = null;
+              _._render({
+                isHideXStyle: false,
+                isHideYStyle: false
+              });
+            }
+          })
+        },
+        defaultStartCallBack(item) {
+          let activeItem = this.activeItem;
+          activeItem && (activeItem.style.color = activeItem._defaultColor);
+          item.style.color = this.activeColor;
+          this.activeItem = item;
+        },
+        defaultCompleteCallBack(item) {
+          // item.style.color = item._defaultColor;
+        },
+        _animation(item, params = {
+          type: 'btn',
+          start: this.defaultStartCallBack,
+          complete: this.defaultCompleteCallBack
+        }) {
+          if (this.animationIsInProgress) {
+            return;
+          }
+          this.animationIsInProgress = true;
+          params.start = typeof params.start === 'function' ? params.start : this.defaultStartCallBack
+          params.complete = typeof params.complete === 'function' ? params.complete : this.defaultCompleteCallBack;
+
+          if (typeof params.start === 'function') {
+            params.start.call(this, item);
+          }
+
+          // 获取当前页面上的初始角度
+          let { xdeg: currentXdeg, ydeg: currentYdeg } = this.getDeg();
+          // 获取将要改变的角度
+          let { xdeg, ydeg } = this.getDeg(item);
+          // 获取每步走的角度
+          let xStep = +(xdeg - currentXdeg > 0 || -1),
+            yStep = +(ydeg - currentYdeg > 0 || -1);
+          let absXStep = Math.abs(xdeg - currentXdeg), absYStep = Math.abs(ydeg - currentYdeg)
+          let xRenderIsCompleted, yRenderIsCompleted;
+          if (absXStep > absYStep) { // 如果x>y,则y每步走的角度为x/y
+            yStep = yStep * (absYStep / absXStep);
+          } else {
+            xStep = xStep * (absXStep / absYStep);
+          }
+          // 动态生成判断是否结束函数
+          xRenderIsCompleted = xStep < 0 ? 'return compareXdeg<=xdeg' : 'return compareXdeg>=xdeg';
+          xRenderIsCompleted = new Function('compareXdeg', 'xdeg', xRenderIsCompleted)
+          yRenderIsCompleted = yStep < 0 ? 'return compareYdeg<=ydeg' : 'return compareYdeg>=ydeg';
+          yRenderIsCompleted = new Function('compareYdeg', 'ydeg', yRenderIsCompleted)
+          console.log(xRenderIsCompleted, yRenderIsCompleted);
+          function stepChange() {
+            // 判断动画是否已渲染完成
+            if (xRenderIsCompleted(currentXdeg, xdeg) && yRenderIsCompleted(currentYdeg, ydeg)) {
+              _._completed(currentXdeg, currentYdeg);
+              if (typeof params.complete === 'function') {
+                params.complete.call(this, item);
+              }
+              return;
+            }
+            // 执行每步的动画
+            currentXdeg = currentXdeg + xStep;
+            currentYdeg = currentYdeg + yStep;
+            // 处理计算误差
+            currentXdeg = !xRenderIsCompleted(currentXdeg, xdeg) ? currentXdeg : xdeg;
+            currentYdeg = !yRenderIsCompleted(currentYdeg, ydeg) ? currentYdeg : ydeg;
+            // 执行渲染
+            _._render({
+              xdeg: currentXdeg,
+              ydeg: currentYdeg
+            });
+            this.requestId = window.requestAnimationFrame(stepChange);
+          }
+          this.requestId = window.requestAnimationFrame(stepChange);
+        },
+        // 获取deg
+        getDeg(target) {
+          target = typeof target === 'undefined' ? this.ctx : target;
+          const { xdeg, ydeg } = target.attributes;
+          return {
+            xdeg: parseFloat(xdeg.value),
+            ydeg: parseFloat(ydeg.value)
+          }
+        },
+        // 执行渲染
+        _render(params = {
+          xdeg: '',
+          ydeg: '',
+          xColor: '',
+          yColor,
+          size,
+          isHideXStyle,
+          isHideYStyle
+        }) {
+          let degs = this.getDeg();
+          params.xdeg = typeof params.xdeg === 'undefined' ? degs.xdeg : params.xdeg;
+          params.ydeg = typeof params.ydeg === 'undefined' ? degs.ydeg : params.ydeg;
+          
+          let {xColor:ownXColor, yColor:ownYColor} = this.ctx.attributes;
+          params.xColor = typeof params.xColor === 'undefined' ? ownXColor.value : params.xColor;
+          params.yColor = typeof params.yColor === 'undefined' ? ownYColor.value : params.yColor;
+
+          params.isHideXStyle = typeof params.isHideXStyle === 'undefined' ? this.ctx.isHideXStyle : params.isHideXStyle;
+          params.isHideYStyle = typeof params.isHideYStyle === 'undefined' ? this.ctx.isHideYStyle : params.isHideYStyle;
+          let lgXStyle = `linear-gradient(${params.xdeg}deg, transparent 0, transparent 49.5%, ${params.xColor} 49.5%, ${params.xColor}  50.5%, transparent 50.5%, transparent 100%)`;
+          let lgYStyle = `linear-gradient(${params.ydeg}deg, transparent 0, transparent 49.5%, ${params.yColor} 49.5%, ${params.yColor} 50.5%, transparent 50.5%, transparent 100%)`;
+          let styleArr = [];
+          if(!params.isHideXStyle) {
+            this.ctx.isHideXStyle = false;
+            styleArr.push(lgXStyle);
+          }
+          if(!params.isHideYStyle) {
+            this.ctx.isHideYStyle = false;
+            styleArr.push(lgYStyle);
+          }
+          this.ctx.style.backgroundImage = styleArr.join();
+          this.ctx.style.backgroundSize = params.size;
+
+        },
+        // 渲染结束后回调
+        _completed(xdeg, ydeg) {
+          window.cancelAnimationFrame(this.requestId);
+          this.ctx.setAttribute('xdeg', `${xdeg}deg`);
+          this.ctx.setAttribute('ydeg', `${ydeg}deg`);
+          _.animationIsInProgress = false;
+        },
+        // proxy 
+        proxyProgress() {
+          let animationIsInProgress = _.animationIsInProgress;
+          let animationBtnGroup = document.querySelectorAll('button[animation-btn]')
+          Object.defineProperty(_, 'animationIsInProgress', {
+            get() {
+              return animationIsInProgress;
+            },
+            set(newVal) {
+              animationIsInProgress = newVal;
+              if (newVal) { // 动画开始后, 按钮禁用
+                Array.prototype.forEach.call(animationBtnGroup, item => {
+                  item.setAttribute('disabled', 'disabled');
+                });
+              } else { // 动画结束后, 按钮解禁
+                Array.prototype.forEach.call(animationBtnGroup, item => {
+                  item.removeAttribute('disabled');
+                });
+              }
+            }
+          })
+        }
+      };
+
+      // init 
+      _.init();
+    }(window, document);
+  </script>
+</body>
+
+</html>
