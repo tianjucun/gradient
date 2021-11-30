@@ -219,7 +219,7 @@
           document.querySelector('#js-cancel-hide-btn').addEventListener('click', function() {
             if(_.checkedRadio) {
               _.checkedRadio.checked = false;
-              _.preCheckedRadio.checked = false;
+              _.preCheckedRadio && (_.preCheckedRadio.checked = false);
               changeStatus();
               _.preCheckedRadio = _.checkedRadio = null;
               _._render({
